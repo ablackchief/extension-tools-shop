@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import fs from 'fs';
-import path from 'path';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const BUSINESS_EMAIL = process.env.BUSINESS_EMAIL || 'support@extensionsurvivalguide.co.uk';
@@ -18,30 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store subscriber in JSON file for records
-    const subscribersPath = path.join(process.cwd(), 'subscribers.json');
-    let subscribers: { email: string; source: string; date: string }[] = [];
-
-    if (fs.existsSync(subscribersPath)) {
-      const data = fs.readFileSync(subscribersPath, 'utf8');
-      subscribers = JSON.parse(data);
-    }
-
-    // Check for duplicate
-    const alreadySubscribed = subscribers.some(
-      (s) => s.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (!alreadySubscribed) {
-      subscribers.push({
-        email,
-        source: source || 'unknown',
-        date: new Date().toISOString(),
-      });
-      fs.writeFileSync(subscribersPath, JSON.stringify(subscribers, null, 2));
-    }
-
-    // Send email with PDF link
+    // Send checklist email to subscriber
     await resend.emails.send({
       from: `Extension Survival Guide <${BUSINESS_EMAIL}>`,
       to: email,
@@ -114,6 +89,41 @@ export async function POST(request: NextRequest) {
       <a href="${BASE_URL}" style="color: #94a3b8;">extensionsurvivalguide.co.uk</a>
     </p>
   </div>
+</body>
+</html>
+      `,
+    });
+
+    // Send notification to yourself
+    await resend.emails.send({
+      from: `Extension Survival Guide <${BUSINESS_EMAIL}>`,
+      to: BUSINESS_EMAIL,
+      subject: `New Checklist Signup: ${email}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #16a34a;">New Checklist Signup</h2>
+
+  <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+    <tr>
+      <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: 600;">Email</td>
+      <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${email}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-weight: 600;">Source</td>
+      <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${source || 'unknown'}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; font-weight: 600;">Date</td>
+      <td style="padding: 8px 0;">${new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' })}</td>
+    </tr>
+  </table>
+
+  <p style="color: #64748b; font-size: 14px;">Checklist email has been sent to the subscriber automatically.</p>
 </body>
 </html>
       `,
